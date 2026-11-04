@@ -19,25 +19,17 @@ export function appId(
   model: '2.0' | '2.5',
   mode: 'text' | 'image'
 ) {
-  if (model === '2.0' && mode === 'image') {
-    return '2118074377400840194';
+  if (model === '2.0') {
+    return '2104435502584987649';
   }
 
-  const key = model === '2.0'
-    ? (mode === 'image'
-        ? 'SEEDANCE20_I2V_WEBAPP_ID'
-        : 'SEEDANCE20_T2V_WEBAPP_ID')
-    : (mode === 'image'
-        ? 'SEEDANCE25_I2V_WEBAPP_ID'
-        : 'SEEDANCE25_T2V_WEBAPP_ID');
-
-  const id = process.env[key];
-
-  if (!id) {
-    throw new Error(`${key} belum dikonfigurasi di Vercel.`);
+  if (mode === 'text') {
+    throw new Error(
+      'Seedance 2.5 yang dipilih belum dikonfigurasi untuk Text-to-Video.'
+    );
   }
 
-  return id;
+  return '2085913383404068865';
 }
 
 export async function rhPost(
@@ -59,10 +51,8 @@ export async function rhPost(
 
   if (
     !res.ok ||
-    (
-      typeof json.code === 'number' &&
-      ![0, 200].includes(json.code)
-    )
+    (typeof json.code === 'number' &&
+      ![0, 200].includes(json.code))
   ) {
     throw new Error(
       json.msg ||
@@ -94,10 +84,8 @@ export async function getAppInputs(
 
   if (
     !res.ok ||
-    (
-      typeof json.code === 'number' &&
-      ![0, 200].includes(json.code)
-    )
+    (typeof json.code === 'number' &&
+      ![0, 200].includes(json.code))
   ) {
     throw new Error(
       json.msg ||
