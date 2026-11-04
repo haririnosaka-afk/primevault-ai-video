@@ -1,0 +1,48 @@
+PRIMEVAULT AI VIDEO — PANDUAN PEMASANGAN
+
+PENTING:
+- API key RunningHub yang pernah dikirim di chat harus di-reset.
+- Jangan pernah menaruh API key di file frontend atau di GitHub.
+- Gunakan Environment Variables di Vercel.
+- App ID yang ada di .env.example adalah kandidat AI App publik; belum membuktikan billing RH Coins berhasil sampai tes task dilakukan.
+- Seedance 2.0 Text-to-Video sengaja belum diaktifkan karena belum ditemukan AI App Consumer yang terverifikasi untuk mode itu.
+
+A. SIAPKAN GITHUB
+1. Buka https://github.com dan login.
+2. Buat repository baru bernama primevault-ai-video.
+3. Pilih Public atau Private (disarankan Private saat pengembangan).
+4. Upload semua isi folder project ini ke repository. Jangan upload .env.local.
+5. Pastikan file .env.local tidak ada di GitHub.
+
+B. SIAPKAN RUNNINGHUB
+1. Reset API Key lama.
+2. Buat API Key Consumer-Membership baru.
+3. Simpan key tersebut untuk langkah Vercel. Jangan kirim ke chat.
+4. App ID kandidat ada di .env.example.
+
+C. DEPLOY KE VERCEL
+1. Buka https://vercel.com lalu login dengan GitHub.
+2. Pilih Add New > Project.
+3. Import repository primevault-ai-video.
+4. Sebelum Deploy, buka Environment Variables.
+5. Tambahkan:
+   RUNNINGHUB_API_KEY = API key baru
+   SEEDANCE20_I2V_WEBAPP_ID = 2037048798156951553
+   SEEDANCE20_T2V_WEBAPP_ID = (kosongkan; belum terverifikasi)
+   SEEDANCE25_I2V_WEBAPP_ID = 2085913918787526657
+   SEEDANCE25_T2V_WEBAPP_ID = 2086023518503854082
+6. Klik Deploy.
+
+D. CATATAN PENGUJIAN
+Project ini adalah starter integrasi, bukan klaim bahwa semua aplikasi sudah berhasil dipanggil. RunningHub dapat mengubah struktur node tiap AI App. Backend mencoba membaca node melalui API Call Demo. Jika muncul pesan node prompt/image tidak ditemukan, perlu pemetaan node aplikasi yang tepat dari halaman API Call Demo.
+Jangan melakukan banyak tes generate. Pastikan dulu parameter node benar dan periksa perkiraan biaya pada RunningHub.
+
+E. MENJALANKAN LOKAL (OPSIONAL)
+- Install Node.js 20 atau lebih baru.
+- Salin .env.example menjadi .env.local dan isi API key secara lokal.
+- Jalankan: npm install
+- Jalankan: npm run dev
+- Buka: http://localhost:3000
+
+DOKUMENTASI:
+https://www.runninghub.ai/runninghub-api-doc-en/
