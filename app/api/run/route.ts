@@ -1,59 +1,123 @@
+
 import { NextRequest, NextResponse } from 'next/server';
-import { appId, getAppInputs, rhPost, requireKey } from '@/lib/runninghub';
+import {
+  appId,
+  getAppInputs,
+  rhPost,
+  requireKey
+} from '@/lib/runninghub';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
     const model = body.model === '2.0' ? '2.0' : '2.5';
     const mode = body.mode === 'image' ? 'image' : 'text';
     const prompt = String(body.prompt || '').trim();
 
     if (!prompt) {
-      return NextResponse.json({ error: 'Prompt wajib diisi.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Prompt wajib diisi.' },
+        { status: 400 }
+      );
     }
 
     if (mode === 'image' && !body.fileName) {
-      return NextResponse.json({ error: 'Gambar referensi belum diunggah.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Gambar referensi belum diunggah.' },
+        { status: 400 }
+      );
     }
 
     const key = requireKey();
     const webappId = appId(model, mode);
+
     const inputs = await getAppInputs(webappId, key);
 
-    const promptNode = inputs.find(n =>
-      n.fieldName?.toLowerCase() === 'prompt'
-    ) || inputs.find(n =>
-      `${n.description || ''} ${n.descriptionEn || ''}`.toLowerCase().includes('prompt')
+    const promptNode = inputs.find(
+      n => n.fieldName?.toLowerCase() === 'prompt'
     );
 
-    const imageNode = inputs.find(n => n.fieldType === 'IMAGE');
-
     if (!promptNode) {
-      return NextResponse.json({ error: 'Node prompt tidak ditemukan.' }, { status: 422 });
+      return NextResponse.json(
+        { error: 'Node prompt tidak ditemukan.' },
+        { status: 422 }
+      );
     }
 
-    if (mode === 'image' && !imageNode) {
-      return NextResponse.json({ error: 'Input gambar tidak ditemukan.' }, { status: 422 });
+    const imageNodes = inputs.filter(
+      n => n.fieldType === 'IMAGE'
+    );
+
+    if (mode === 'image' && imageNodes.length === 0) {
+      return NextResponse.json(
+        { error: 'Input gambar tidak ditemukan.' },
+        { status: 422 }
+      );
     }
 
-    const nodeInfoList = [
-      {
-        nodeId: promptNode.nodeId,
-        fieldName: promptNode.fieldName,
-        fieldValue: prompt
-      },
-      ...(mode === 'image' && imageNode ? [{
-        nodeId: imageNode.nodeId,
-        fieldName: imageNode.fieldName,
-        fieldValue: String(body.fileName)
-      }] : [])
-    ];
+    // Susun semua input berdasarkan konfigurasi asli RunningHub.
+    const nodeInfoList = inputs.flatMap((node, index) => {
+      // Prompt
+      if (node.nodeId === promptNode.nodeId) {
+        return [{
+          nodeId: node.nodeId,
+          fieldName: node.fieldName,
+          fieldValue: prompt
+        }];
+      }
+
+      // Input gambar
+      if (node.fieldType === 'IMAGE') {
+        if (mode !== 'image') return [];
+
+        const imageIndex = imageNodes.findIndex(
+          img => img.nodeId === node.nodeId
+        );
+
+        // Gambar pertama
+        if (imageIndex === 0) {
+          return [{
+            nodeId: node.nodeId,
+            fieldName: node.fieldName,
+            fieldValue: String(body.fileName)
+          }];
+        }
+
+        // Gambar frame terakhir jika pengguna mengirimkannya.
+        if (imageIndex === 1 && body.endFileName) {
+          return [{
+            nodeId: node.nodeId,
+            fieldName: node.fieldName,
+            fieldValue: String(body.endFileName)
+          }];
+        }
+
+        // Jangan gunakan gambar contoh dari RunningHub.
+        return [];
+      }
+
+      // Gunakan nilai default dari konfigurasi AI App.
+      if (node.fieldValue !== undefined && node.fieldValue !== null) {
+        return [{
+          nodeId: node.nodeId,
+          fieldName: node.fieldName,
+          fieldValue: String(node.fieldValue)
+        }];
+      }
+
+      return [];
+    });
 
     const result: any = await rhPost(
       '/task/openapi/ai-app/run',
-      { webappId, apiKey: key, nodeInfoList },
+      {
+        webappId,
+        apiKey: key,
+        nodeInfoList
+      },
       key
     );
 
@@ -61,19 +125,23 @@ export async function POST(req: NextRequest) {
 
     if (!taskId) {
       return NextResponse.json({
-        error: result?.msg || 'Task ID tidak ditemukan.',
+        error: result?.msg || result?.message ||
+          'Task ID tidak ditemukan.',
         details: result
       }, { status: 502 });
     }
 
     return NextResponse.json({
+      ok: true,
       taskId,
       status: result?.data?.taskStatus || 'RUNNING',
-      webappId
+      webappId,
+      message: 'Task berhasil dikirim ke RunningHub.'
     });
 
   } catch (e) {
     return NextResponse.json({
+      ok: false,
       error: e instanceof Error ? e.message : 'Run error'
     }, { status: 500 });
   }
