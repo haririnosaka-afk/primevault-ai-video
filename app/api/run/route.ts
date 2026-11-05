@@ -24,24 +24,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const images = Array.isArray(body.images)
-      ? body.images.filter((x: unknown) => typeof x === 'string' && x)
-      : [body.fileName, body.endFileName].filter(
-          (x: unknown) => typeof x === 'string' && x
-        );
-
-    if (mode === 'image' && images.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: 'Gambar referensi belum diunggah.' },
-        { status: 400 }
-      );
-    }
-
     if (model === '2.5' && mode === 'text') {
       return NextResponse.json(
         {
           ok: false,
-          error: 'Seedance 2.5 ini menggunakan mode multimodal.'
+          error: 'Seedance 2.5 harus menggunakan mode multimodal.'
+        },
+        { status: 400 }
+      );
+    }
+
+    const images = Array.isArray(body.images)
+      ? body.images.filter(
+          (x: unknown) => typeof x === 'string' && x.trim()
+        )
+      : [];
+
+    const videoFileName =
+      typeof body.videoFileName === 'string'
+        ? body.videoFileName
+        : '';
+
+    const audioFileName =
+      typeof body.audioFileName === 'string'
+        ? body.audioFileName
+        : '';
+
+    const maxImages = model === '2.0' ? 4 : 5;
+
+    if (images.length > maxImages) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Maksimal ${maxImages} gambar untuk Seedance ${model}.`
+        },
+        { status: 400 }
+      );
+    }
+
+    if (mode === 'image' && images.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: 'Upload minimal satu gambar.' },
+        { status: 400 }
+      );
+    }
+
+    if (model === '2.0' && (videoFileName || audioFileName)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Input video dan audio tersedia pada konfigurasi Seedance 2.5.'
         },
         { status: 400 }
       );
@@ -57,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     if (!textNode) {
       return NextResponse.json(
-        { ok: false, error: 'Input text tidak ditemukan.' },
+        { ok: false, error: 'Input prompt tidak ditemukan.' },
         { status: 422 }
       );
     }
@@ -66,54 +98,75 @@ export async function POST(req: NextRequest) {
       node => node.fieldType === 'IMAGE'
     );
 
-    if (mode === 'image' && imageNodes.length === 0) {
+    const videoNode = inputs.find(
+      node => node.fieldType === 'VIDEO'
+    );
+
+    const audioNode = inputs.find(
+      node => node.fieldType === 'AUDIO'
+    );
+
+    if (images.length > imageNodes.length) {
       return NextResponse.json(
-        { ok: false, error: 'Input gambar tidak ditemukan.' },
+        {
+          ok: false,
+          error: 'Jumlah gambar melebihi slot gambar AI App.'
+        },
+        { status: 422 }
+      );
+    }
+
+    if (videoFileName && !videoNode) {
+      return NextResponse.json(
+        { ok: false, error: 'Input video tidak tersedia pada AI App.' },
+        { status: 422 }
+      );
+    }
+
+    if (audioFileName && !audioNode) {
+      return NextResponse.json(
+        { ok: false, error: 'Input audio tidak tersedia pada AI App.' },
         { status: 422 }
       );
     }
 
     const nodeInfoList = inputs.flatMap(node => {
-      const type = node.fieldType;
-
-      if (type === 'IMAGE') {
+      if (node.fieldType === 'IMAGE') {
         if (mode !== 'image') return [];
 
         const index = imageNodes.indexOf(node);
-        const file = images[index];
+        const fileName = images[index];
 
-        if (!file) return [];
-
-        return [{
-          nodeId: node.nodeId,
-          fieldName: node.fieldName,
-          fieldValue: file
-        }];
-      }
-
-      if (type === 'VIDEO') {
-        if (!body.videoFileName) return [];
+        if (!fileName) return [];
 
         return [{
           nodeId: node.nodeId,
           fieldName: node.fieldName,
-          fieldValue: String(body.videoFileName)
+          fieldValue: fileName
         }];
       }
 
-      if (type === 'AUDIO') {
-        if (!body.audioFileName) return [];
+      if (node.fieldType === 'VIDEO') {
+        if (!videoFileName) return [];
 
         return [{
           nodeId: node.nodeId,
           fieldName: node.fieldName,
-          fieldValue: String(body.audioFileName)
+          fieldValue: videoFileName
         }];
       }
 
-      if (
-        node.fieldName?.toLowerCase() === 'text'
-      ) {
+      if (node.fieldType === 'AUDIO') {
+        if (!audioFileName) return [];
+
+        return [{
+          nodeId: node.nodeId,
+          fieldName: node.fieldName,
+          fieldValue: audioFileName
+        }];
+      }
+
+      if (node.fieldName?.toLowerCase() === 'text') {
         return [{
           nodeId: node.nodeId,
           fieldName: node.fieldName,
@@ -121,7 +174,10 @@ export async function POST(req: NextRequest) {
         }];
       }
 
+      // Kirim pengaturan bawaan seperti ratio,
+      // duration, resolution, bitrateMode, dan outputFormat.
       if (
+        node.fieldType === 'LIST' &&
         node.fieldValue !== undefined &&
         node.fieldValue !== null
       ) {
@@ -132,6 +188,7 @@ export async function POST(req: NextRequest) {
         }];
       }
 
+      // Jangan kirim file contoh bawaan AI App.
       return [];
     });
 
@@ -151,7 +208,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: result?.msg || result?.message ||
+          error:
+            result?.msg ||
+            result?.message ||
             'RunningHub tidak mengembalikan Task ID.',
           details: result
         },
