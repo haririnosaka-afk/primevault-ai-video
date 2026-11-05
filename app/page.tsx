@@ -67,7 +67,10 @@ export default function Home() {
     setBalanceLoading(true);
 
     try {
-      const res = await fetch('/api/balance', { cache: 'no-store' });
+      const res = await fetch('/api/balance', {
+        cache: 'no-store'
+      });
+
       const data = await res.json();
 
       if (!res.ok || !data.ok) {
@@ -76,7 +79,9 @@ export default function Home() {
 
       setBalance(data.balance);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Gagal membaca saldo.');
+      setMessage(
+        e instanceof Error ? e.message : 'Gagal membaca saldo.'
+      );
     } finally {
       setBalanceLoading(false);
     }
@@ -86,10 +91,15 @@ export default function Home() {
     refreshBalance();
   }, []);
 
-  function updateHistory(taskId: string, patch: Partial<HistoryItem>) {
+  function updateHistory(
+    taskId: string,
+    patch: Partial<HistoryItem>
+  ) {
     setHistory(previous =>
       previous.map(item =>
-        item.taskId === taskId ? { ...item, ...patch } : item
+        item.taskId === taskId
+          ? { ...item, ...patch }
+          : item
       )
     );
   }
@@ -124,19 +134,19 @@ export default function Home() {
     }
 
     if (model === '2.5' && mode !== 'image') {
-      setMessage('Seedance 2.5 saat ini menggunakan mode multimodal.');
+      setMessage('Seedance 2.5 menggunakan mode multimodal.');
       return;
     }
 
     const maxImages = model === '2.0' ? 4 : 5;
 
     if (images.length > maxImages) {
-      setMessage(`Maksimal ${maxImages} gambar untuk model ini.`);
+      setMessage(`Maksimal ${maxImages} gambar.`);
       return;
     }
 
     setBusy(true);
-    setMessage('Mengunggah file...');
+    setMessage('Menyiapkan file...');
     setResult(null);
 
     let currentTaskId = '';
@@ -166,7 +176,9 @@ export default function Home() {
 
       const res = await fetch('/api/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           model,
           mode,
@@ -179,7 +191,7 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || !data.ok) {
         throw new Error(data.error || 'Gagal membuat task.');
       }
 
@@ -196,7 +208,7 @@ export default function Home() {
           model,
           mode,
           prompt,
-          status: 'RUNNING',
+          status: 'QUEUED',
           consumeCoins: null,
           videos: [],
           createdAt: new Date().toISOString()
@@ -204,50 +216,64 @@ export default function Home() {
         ...previous
       ].slice(0, 100));
 
-      setMessage('Task diterima RunningHub. Memantau hasil...');
+      setMessage('Task diterima. Menunggu hasil video...');
 
       let done = false;
 
       for (let i = 0; i < 90 && !done; i++) {
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
-        const s = await fetch(
+        const statusResponse = await fetch(
           `/api/status?taskId=${encodeURIComponent(currentTaskId)}`,
           { cache: 'no-store' }
         );
 
-        const sj = await s.json();
+        const statusData = await statusResponse.json();
 
-        if (!s.ok) {
-          throw new Error(sj.error || 'Gagal memeriksa status.');
+        if (!statusResponse.ok) {
+          throw new Error(
+            statusData.error || 'Gagal memeriksa status.'
+          );
         }
+
+        const taskStatus = statusData.status || 'RUNNING';
+        const taskVideos = statusData.videos || [];
+        const coins = statusData.consumeCoins ?? null;
 
         setResult({
           taskId: currentTaskId,
-          status: sj.status,
-          videos: sj.videos,
-          consumeCoins: sj.consumeCoins
+          status: taskStatus,
+          videos: taskVideos,
+          consumeCoins: coins
         });
 
         updateHistory(currentTaskId, {
-          status: sj.status || 'RUNNING',
-          consumeCoins: sj.consumeCoins ?? null,
-          videos: sj.videos || []
+          status: taskStatus,
+          consumeCoins: coins,
+          videos: taskVideos
         });
 
-        if (sj.videos?.length) {
-          setMessage('Video selesai.');
+        if (taskStatus === 'SUCCESS' && taskVideos.length > 0) {
+          setMessage('Video berhasil dibuat!');
           done = true;
-          refreshBalance();
-        } else if (sj.status === 'FAILED' || sj.failed) {
-          throw new Error(sj.error || 'Task gagal di RunningHub.');
+          await refreshBalance();
+        } else if (taskStatus === 'FAILED' || statusData.failed) {
+          throw new Error(
+            statusData.error || 'Task gagal di RunningHub.'
+          );
         } else {
-          setMessage(`Status: ${sj.status || 'RUNNING'}...`);
+          setMessage(
+            taskStatus === 'QUEUED'
+              ? 'Task sedang mengantre...'
+              : `Task sedang diproses... (${i + 1}/90)`
+          );
         }
       }
 
       if (!done) {
-        setMessage('Task masih diproses. Kamu bisa cek lagi menggunakan Task ID.');
+        setMessage(
+          'Task masih diproses. Gunakan Task ID untuk memeriksa kembali.'
+        );
       }
 
     } catch (e) {
@@ -258,7 +284,9 @@ export default function Home() {
       setMessage(errorMessage);
 
       if (currentTaskId) {
-        updateHistory(currentTaskId, { status: 'FAILED' });
+        updateHistory(currentTaskId, {
+          status: 'FAILED'
+        });
       }
     } finally {
       setBusy(false);
@@ -270,7 +298,9 @@ export default function Home() {
       <header>
         <div className="brandMark">PV</div>
         <div>
-          <div className="brand">PRIMEVAULT <span>AI VIDEO</span></div>
+          <div className="brand">
+            PRIMEVAULT <span>AI VIDEO</span>
+          </div>
           <small>CREATIVE VIDEO STUDIO · RUNNINGHUB</small>
         </div>
         <div className="status"><i /> API CONNECTOR</div>
@@ -278,7 +308,10 @@ export default function Home() {
 
       <section className="hero">
         <p className="eyebrow">GENERATIVE VIDEO WORKSPACE</p>
-        <h1>Turn your ideas<br /><em>into motion.</em></h1>
+        <h1>
+          Turn your ideas<br />
+          <em>into motion.</em>
+        </h1>
         <p className="sub">
           Buat video dengan Seedance 2.0 dan 2.5 melalui RunningHub.
         </p>
@@ -290,7 +323,10 @@ export default function Home() {
             <p className="eyebrow">RH COINS MONITOR</p>
             <h2>Saldo RunningHub</h2>
           </div>
-          <button onClick={refreshBalance} disabled={balanceLoading}>
+          <button
+            onClick={refreshBalance}
+            disabled={balanceLoading}
+          >
             {balanceLoading ? 'MEMERIKSA...' : '↻ REFRESH'}
           </button>
         </div>
@@ -311,7 +347,7 @@ export default function Home() {
         </div>
 
         <p className="note">
-          Saldo menampilkan angka RH Coins yang dilaporkan RunningHub.
+          Saldo menampilkan angka RH Coins dari RunningHub.
         </p>
       </section>
 
@@ -379,7 +415,7 @@ export default function Home() {
 
         {model === '2.5' && (
           <p className="note">
-            Mode multimodal: minimal satu gambar, dengan video dan audio opsional.
+            Mode multimodal: minimal satu gambar, video dan audio opsional.
           </p>
         )}
 
@@ -402,7 +438,9 @@ export default function Home() {
               onChange={e => {
                 const selected = Array.from(e.target.files || []);
                 const limit = model === '2.0' ? 4 : 5;
+
                 setImages(selected.slice(0, limit));
+
                 if (selected.length > limit) {
                   setMessage(`Maksimal ${limit} gambar.`);
                 }
@@ -427,7 +465,9 @@ export default function Home() {
               <input
                 type="file"
                 accept="video/*"
-                onChange={e => setVideoFile(e.target.files?.[0] || null)}
+                onChange={e =>
+                  setVideoFile(e.target.files?.[0] || null)
+                }
               />
               {videoFile && <small>{videoFile.name}</small>}
             </div>
@@ -437,27 +477,40 @@ export default function Home() {
               <input
                 type="file"
                 accept="audio/*"
-                onChange={e => setAudioFile(e.target.files?.[0] || null)}
+                onChange={e =>
+                  setAudioFile(e.target.files?.[0] || null)
+                }
               />
               {audioFile && <small>{audioFile.name}</small>}
             </div>
           </>
         )}
 
-        <button className="generate" disabled={busy} onClick={generate}>
+        <button
+          className="generate"
+          disabled={busy}
+          onClick={generate}
+        >
           {busy ? 'PROCESSING...' : 'GENERATE VIDEO'} <span>↗</span>
         </button>
 
         <p className="note">
-          Biaya pemrosesan mengikuti aplikasi dan parameter RunningHub.
+          Biaya mengikuti konfigurasi AI App RunningHub.
         </p>
 
         {message && (
           <div className="message">
             {message}
-            {result?.taskId && <small>Task ID: {result.taskId}</small>}
+            {result?.taskId && (
+              <small>Task ID: {result.taskId}</small>
+            )}
+            {result?.status && (
+              <small>Status: {result.status}</small>
+            )}
             {result?.consumeCoins != null && (
-              <small>RH Coins terpakai: {result.consumeCoins}</small>
+              <small>
+                RH Coins terpakai: {result.consumeCoins}
+              </small>
             )}
           </div>
         )}
@@ -497,7 +550,11 @@ export default function Home() {
                 }}
               >
                 <b>SEEDANCE {item.model}</b>
-                <p>{item.mode === 'image' ? 'Image / Multimodal' : 'Text-to-Video'}</p>
+                <p>
+                  {item.mode === 'image'
+                    ? 'Image / Multimodal'
+                    : 'Text-to-Video'}
+                </p>
                 <p>{item.prompt}</p>
                 <small>Task ID: {item.taskId}</small>
                 <p>Status: <b>{item.status}</b></p>
