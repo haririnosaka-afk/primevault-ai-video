@@ -24,7 +24,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (mode === 'image' && !body.fileName) {
+    const images = Array.isArray(body.images)
+      ? body.images.filter((x: unknown) => typeof x === 'string' && x)
+      : [body.fileName, body.endFileName].filter(
+          (x: unknown) => typeof x === 'string' && x
+        );
+
+    if (mode === 'image' && images.length === 0) {
       return NextResponse.json(
         { ok: false, error: 'Gambar referensi belum diunggah.' },
         { status: 400 }
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: 'Seedance 2.5 yang dipilih menggunakan mode gambar/video.'
+          error: 'Seedance 2.5 ini menggunakan mode multimodal.'
         },
         { status: 400 }
       );
@@ -45,13 +51,13 @@ export async function POST(req: NextRequest) {
     const webappId = appId(model, mode);
     const inputs = await getAppInputs(webappId, key);
 
-    const promptNode = inputs.find(
-      node => node.fieldName?.toLowerCase() === 'prompt'
+    const textNode = inputs.find(
+      node => node.fieldName?.toLowerCase() === 'text'
     );
 
-    if (!promptNode) {
+    if (!textNode) {
       return NextResponse.json(
-        { ok: false, error: 'Input prompt tidak ditemukan.' },
+        { ok: false, error: 'Input text tidak ditemukan.' },
         { status: 422 }
       );
     }
@@ -68,33 +74,45 @@ export async function POST(req: NextRequest) {
     }
 
     const nodeInfoList = inputs.flatMap(node => {
-      if (node.fieldType === 'IMAGE') {
+      const type = node.fieldType;
+
+      if (type === 'IMAGE') {
         if (mode !== 'image') return [];
 
-        const imageIndex = imageNodes.indexOf(node);
+        const index = imageNodes.indexOf(node);
+        const file = images[index];
 
-        if (imageIndex === 0) {
-          return [{
-            nodeId: node.nodeId,
-            fieldName: node.fieldName,
-            fieldValue: String(body.fileName)
-          }];
-        }
+        if (!file) return [];
 
-        if (imageIndex === 1 && body.endFileName) {
-          return [{
-            nodeId: node.nodeId,
-            fieldName: node.fieldName,
-            fieldValue: String(body.endFileName)
-          }];
-        }
+        return [{
+          nodeId: node.nodeId,
+          fieldName: node.fieldName,
+          fieldValue: file
+        }];
+      }
 
-        return [];
+      if (type === 'VIDEO') {
+        if (!body.videoFileName) return [];
+
+        return [{
+          nodeId: node.nodeId,
+          fieldName: node.fieldName,
+          fieldValue: String(body.videoFileName)
+        }];
+      }
+
+      if (type === 'AUDIO') {
+        if (!body.audioFileName) return [];
+
+        return [{
+          nodeId: node.nodeId,
+          fieldName: node.fieldName,
+          fieldValue: String(body.audioFileName)
+        }];
       }
 
       if (
-        node.fieldName?.toLowerCase() ===
-        promptNode.fieldName?.toLowerCase()
+        node.fieldName?.toLowerCase() === 'text'
       ) {
         return [{
           nodeId: node.nodeId,
@@ -103,7 +121,10 @@ export async function POST(req: NextRequest) {
         }];
       }
 
-      if (node.fieldValue !== undefined && node.fieldValue !== null) {
+      if (
+        node.fieldValue !== undefined &&
+        node.fieldValue !== null
+      ) {
         return [{
           nodeId: node.nodeId,
           fieldName: node.fieldName,
