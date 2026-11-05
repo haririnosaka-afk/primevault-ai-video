@@ -31,6 +31,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (model === '2.5' && mode === 'text') {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Seedance 2.5 yang dipilih menggunakan mode gambar/video.'
+        },
+        { status: 400 }
+      );
+    }
+
     const key = requireKey();
     const webappId = appId(model, mode);
     const inputs = await getAppInputs(webappId, key);
@@ -57,12 +67,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const nodeInfoList = inputs.flatMap((node, index) => {
-      // Input gambar dari pengguna
+    const nodeInfoList = inputs.flatMap(node => {
       if (node.fieldType === 'IMAGE') {
-        if (mode !== 'image') {
-          return [];
-        }
+        if (mode !== 'image') return [];
 
         const imageIndex = imageNodes.indexOf(node);
 
@@ -82,11 +89,9 @@ export async function POST(req: NextRequest) {
           }];
         }
 
-        // Jangan kirim gambar contoh dari konfigurasi.
         return [];
       }
 
-      // Prompt pengguna
       if (
         node.fieldName?.toLowerCase() ===
         promptNode.fieldName?.toLowerCase()
@@ -98,7 +103,6 @@ export async function POST(req: NextRequest) {
         }];
       }
 
-      // Pengaturan bawaan AI App
       if (node.fieldValue !== undefined && node.fieldValue !== null) {
         return [{
           nodeId: node.nodeId,
