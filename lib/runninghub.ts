@@ -1,6 +1,6 @@
 
 const HOST = (
-  process.env.RUNNINGHUB_HOST || 'https://www.runninghub.ai'
+  process.env.RUNNINGHUB_HOST || 'https://www.runninghub.cn'
 ).replace(/\/$/, '');
 
 export function requireKey() {
@@ -8,7 +8,7 @@ export function requireKey() {
 
   if (!key) {
     throw new Error(
-      'RUNNINGHUB_API_KEY belum dipasang di Vercel Environment Variables.'
+      'RUNNINGHUB_API_KEY belum dipasang di Vercel.'
     );
   }
 
@@ -25,7 +25,7 @@ export function appId(
 
   if (mode === 'text') {
     throw new Error(
-      'Seedance 2.5 yang dipilih belum dikonfigurasi untuk Text-to-Video.'
+      'Seedance 2.5 menggunakan mode multimodal.'
     );
   }
 
@@ -97,7 +97,7 @@ export async function getAppInputs(
 
   if (!Array.isArray(nodes) || !nodes.length) {
     throw new Error(
-      'RunningHub tidak mengembalikan konfigurasi input AI App.'
+      'Konfigurasi input AI App tidak ditemukan.'
     );
   }
 
